@@ -1,0 +1,15 @@
+{
+  "name": "sroose-plugins",
+  "description": "Sroose's Claude Code plugins. Install with `/plugin marketplace add Sroose/claude-plugins` then `/plugin install <plugin>@sroose-plugins`.",
+  "owner": {
+    "name": "Sroose"
+  },
+  "plugins": [
+    {
+      "name": "agent-bus",
+      "description": "Message bus between Claude Code sessions on the same machine. Register a name and exchange messages with other named sessions, with auto-rebind on /resume and pre-filtered notifications.",
+      "source": "./plugins/agent-bus",
+      "version": "0.1.0"
+    }
+  ]
+}

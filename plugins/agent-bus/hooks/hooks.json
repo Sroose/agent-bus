@@ -1,0 +1,35 @@
+{
+  "description": "agent-bus hooks: SessionStart sets up the bus.py symlink, injects protocol guidance, and nudges auto-rebind from cwd-memo. UserPromptSubmit syncs sessionTitle. SessionEnd auto-unregisters on clean exits.",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "S=\"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/user_prompt_submit.py\"; [ -f \"$S\" ] || S=$(find \"$HOME/.claude\" -path '*agent-bus*/hooks/scripts/user_prompt_submit.py' 2>/dev/null | head -1); [ -f \"$S\" ] && exec python3 \"$S\""
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "S=\"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/session_start.py\"; [ -f \"$S\" ] || S=$(find \"$HOME/.claude\" -path '*agent-bus*/hooks/scripts/session_start.py' 2>/dev/null | head -1); [ -f \"$S\" ] && exec python3 \"$S\""
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "S=\"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/session_end.py\"; [ -f \"$S\" ] || S=$(find \"$HOME/.claude\" -path '*agent-bus*/hooks/scripts/session_end.py' 2>/dev/null | head -1); [ -f \"$S\" ] && exec python3 \"$S\""
+          }
+        ]
+      }
+    ]
+  }
+}
