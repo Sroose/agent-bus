@@ -1,40 +1,20 @@
 #!/usr/bin/env python3
 """SessionStart hook for agent-bus.
 
-Three jobs:
-1. Maintain a stable symlink at ~/.claude/bus/bus.py → the actual bus.py for
-   this plugin install, so the SKILL.md and user commands can reference one
-   fixed path regardless of where the plugin lives on disk.
-2. Inject protocol guidance into the session so Claude knows how to handle
-   inbox notifications.
-3. Nudge auto-rebind if there's a cwd-memo indicating this host directory was
+Two jobs:
+1. Inject protocol guidance into the session so Claude knows how to handle
+   inbox notifications and how to resolve the helper script.
+2. Auto-rebind if there's a cwd-memo indicating this host directory was
    previously registered as some agent name.
+
+(No symlink maintenance. The helper is resolved at call time via a
+cache-scoped `find … | sort -V | tail -1` — see SKILL.md. Symlinks were
+removed in 0.1.3 because a single shared ~/.claude/bus link can't serve a
+container and the host at once, and the repair logic was unreachable through
+a broken link.)
 """
 import json, sys, os, glob, socket, hashlib
 from pathlib import Path
-
-PLUGIN_ROOT = Path(__file__).resolve().parents[2]
-SKILL_DIR = PLUGIN_ROOT / "skills" / "agent"
-
-# (1) Maintain stable symlinks for bus.py, PROTOCOL.md, and watch.py so
-# SKILL.md, the user, and the Monitor-tool command have fixed invocation paths.
-#
-# Use RELATIVE symlink targets. ~/.claude is often a shared bind-mount between a
-# Docker container ($HOME=/home/claude) and the host ($HOME=/Users/<you>): same
-# files, different absolute paths. An absolute symlink target is only valid in
-# one namespace; a relative one (e.g. ../plugins/cache/.../bus.py) resolves
-# correctly in both, since the link and target share the ~/.claude root.
-try:
-    bus_dir = Path.home() / ".claude" / "bus"
-    bus_dir.mkdir(parents=True, exist_ok=True)
-    for name in ("bus.py", "PROTOCOL.md", "watch.py"):
-        target = SKILL_DIR / name
-        link = bus_dir / name
-        if link.is_symlink() or link.exists():
-            link.unlink()
-        link.symlink_to(os.path.relpath(target, link.parent))
-except Exception:
-    pass  # non-fatal; SKILL.md has a find-based fallback
 
 try:
     inp = json.load(sys.stdin)
@@ -49,17 +29,19 @@ host_cwd = os.environ.get("HOST_CWD", "") or inp.get("cwd", "")
 
 guidance = (
     "[agent-bus plugin active]\n\n"
-    "The bus helper is invokable as `python3 ~/.claude/bus/bus.py <subcommand>` — a "
-    "symlink maintained by this hook. (Fallback if the symlink is missing: "
-    "`find ~/.claude -name bus.py -path '*agent-bus*' 2>/dev/null | head -1`.)\n\n"
-    "This session may receive Monitor notifications from `agent-bus-inbox`. The watcher "
-    "pre-filters by your registered name — you only get events for messages addressed to "
-    "you. Each notification's event payload looks like:\n\n"
+    "Resolve the bus helper at call time (don't cache the path):\n"
+    "  BUS=$(find ~/.claude/plugins/cache -path '*agent-bus*/skills/agent/bus.py' "
+    "2>/dev/null | sort -V | tail -1)\n"
+    "then run `python3 \"$BUS\" <subcommand>`. Re-resolve in each Bash call.\n\n"
+    "This session may receive Monitor notifications from the inbox watcher. It "
+    "pre-filters by your registered name — you only get events for messages addressed "
+    "to you. Each notification's event payload looks like:\n\n"
     "    📨 from <FROM> (id=<msg-id>):\n"
     "    <body, may be multi-line>\n"
     "    📨 end\n\n"
-    "Handle each one: brief acknowledge to the user, optionally reply via `bus.py send`, "
-    "then `bus.py archive <id>.json`. See `/agent` for the full operation set."
+    "Handle each one: print the body to the user, optionally reply via "
+    "`python3 \"$BUS\" send …`, then `python3 \"$BUS\" archive <id>.json`. "
+    "See the `/agent` skill for the full operation set."
 )
 
 # If a cwd-memo exists for this host_cwd, and this container isn't already
@@ -118,9 +100,12 @@ if host_cwd:
             guidance += (
                 f"\n\n[host_cwd memo — auto-rebound as `{remembered}`]\n"
                 f"This host directory's prior session was registered as `{remembered}`; "
-                f"this session has been {rebind_status}. If the user wanted a different name, "
-                f"run `/agent unregister` and then register the desired name. Otherwise "
-                f"continue normally — incoming messages addressed to `{remembered}` will flow to you."
+                f"this session has been {rebind_status}. To actually receive messages you "
+                f"must still start the inbox watcher: call the `Monitor` tool with "
+                f"`command: python3 \"$(find ~/.claude/plugins/cache -path '*agent-bus*/skills/agent/watch.py' 2>/dev/null | sort -V | tail -1)\"`, "
+                f"`description: agent-bus: incoming messages for {remembered}`, `persistent: true`. "
+                f"(The hook writes the registry but cannot call tools.) If the user wanted a "
+                f"different name, run `/agent unregister` then register the desired name instead."
             )
 
 out = {

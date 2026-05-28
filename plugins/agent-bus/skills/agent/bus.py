@@ -109,28 +109,13 @@ def cmd_register(args):
             "last_registered_at": data["started_at"],
             "last_container": SELF_HOST,
         }, indent=2))
-    # Ensure ~/.claude/bus/ has stable symlinks to bus.py, PROTOCOL.md, and
-    # watch.py for this plugin install. The SessionStart hook normally
-    # maintains these, but a fresh install mid-session won't have fired the
-    # hook for this session yet — register is a natural recovery point.
-    #
-    # Relative targets so the links survive the container/host ~/.claude
-    # bind-mount boundary (see session_start.py for the full rationale).
-    try:
-        skill_dir = Path(__file__).resolve().parent
-        for fname in ("bus.py", "PROTOCOL.md", "watch.py"):
-            target = skill_dir / fname
-            link = BUS_ROOT / fname
-            if link.is_symlink() or link.exists():
-                link.unlink()
-            link.symlink_to(os.path.relpath(target, link.parent))
-    except Exception:
-        pass
     print(f"registered as {name}")
     # Print the exact Monitor command the agent must invoke next. The SKILL.md
     # also instructs this; printing it here means Claude sees the directive
-    # in tool output regardless of which doc was loaded.
-    watch_path = BUS_ROOT / "watch.py"
+    # in tool output regardless of which doc was loaded. We point at THIS
+    # running script's sibling watch.py (absolute, current version, current
+    # namespace) — guaranteed to exist since it's right next to us.
+    watch_path = Path(__file__).resolve().parent / "watch.py"
     print("")
     print(f"📡 NEXT STEP — start the inbox watcher (REQUIRED for this session to receive messages).")
     print(f"   Call the `Monitor` tool with:")

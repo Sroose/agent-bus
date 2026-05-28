@@ -2,11 +2,17 @@
 
 Read this **only when handling an incoming inbox notification** (a system-reminder block whose payload starts with `📨 from <FROM> (id=<msg-id>):`). For user-issued commands (register, ask, list, etc.), the one-line table in `SKILL.md` is everything you need.
 
-For brevity here `BUS` = `python3 ~/.claude/bus/bus.py`.
+For brevity here `$BUS` means the resolved helper path, same as in SKILL.md:
+
+```bash
+BUS=$(find ~/.claude/plugins/cache -path '*agent-bus*/skills/agent/bus.py' 2>/dev/null | sort -V | tail -1)
+```
+
+Set it at the start of each Bash call (fresh shell each time), then `python3 "$BUS" <subcommand>`.
 
 ## Why this isn't in SKILL.md
 
-The user typically sees CC's monitor-event indicator (the `description` line from `monitors.json`) but **NOT** the notification payload — that's delivered to you as a system reminder, invisible to the user. So you must explicitly print the body. The rest of this file is about how much to print and what to do next.
+The user typically sees CC's monitor-event indicator (the watcher's `description`) but **NOT** the notification payload — that's delivered to you as a system reminder, invisible to the user. So you must explicitly print the body. The rest of this file is about how much to print and what to do next.
 
 ## Step 1 — print the body
 
@@ -20,18 +26,18 @@ Output to the user, depending on body size:
 
 You always have the full body in your context for deciding how to respond. The size threshold only changes what you print to the user.
 
-If you want to surface the full body without bloating your text output, run `BUS read <id>.json` — CC collapses long tool output and the user can expand it.
+If you want to surface the full body without bloating your text output, run `python3 "$BUS" read <id>.json` — CC collapses long tool output and the user can expand it.
 
 ## Step 2 — decide a response
 
-Auto-reply is the default. Send a reply via `BUS send <FROM> "<your reply>"`. The helper echoes the body you sent as `📤 to <FROM>: <body>` in stdout, which IS visible to the user — so you don't need to repeat it in your own text.
+Auto-reply is the default. Send a reply via `python3 "$BUS" send <FROM> "<your reply>"`. The helper echoes the body you sent as `📤 to <FROM>: <body>` in stdout, which IS visible to the user — so you don't need to repeat it in your own text.
 
 If the message needs the user's input (e.g. they were tagged for an opinion) or you're unsure how to respond, say so in one line and wait for the user. The watcher does not require you to reply; archive without sending if there's nothing useful to say.
 
 ## Step 3 — archive
 
-```
-BUS archive <id>.json
+```bash
+python3 "$BUS" archive <id>.json
 ```
 
 The `<id>` is the value shown in `(id=…)` in the notification. Archiving moves the message out of the inbox so it doesn't get re-surfaced.
@@ -60,5 +66,5 @@ src/server/auth/middleware.ts
 You:
 📨 from CODE: src/server/auth/middleware.ts
 Got it — no reply needed.
-[runs BUS archive OBSIDIAN--1715925800--CODE--ab12cd.json]
+[runs python3 "$BUS" archive OBSIDIAN--1715925800--CODE--ab12cd.json]
 ```

@@ -1,5 +1,11 @@
 # Changelog — agent-bus
 
+## 0.1.3 — 2026-05-28
+
+- **Dropped the `~/.claude/bus/` script symlinks entirely; helper is now resolved at call time.** The symlink approach (0.1.1 relative-target fix included) had a fatal flaw: a single shared `~/.claude/bus/bus.py` link can't point at both a container's and the host's plugin copy at once, and the link-repair logic lived *inside* `bus.py` — unreachable when you invoke `bus.py` *through* a dangling link (circular). SKILL.md, PROTOCOL.md, the SessionStart hook, and the register-printed Monitor command now resolve the script via `find ~/.claude/plugins/cache -path '*agent-bus*/skills/agent/bus.py' | sort -V | tail -1` — newest installed version, caller's namespace, nothing cached, nothing to dangle.
+- The `find` is **cache-scoped** on purpose: a blanket `~/.claude` search also matches the marketplace repo clone under `plugins/marketplaces/…` (no version dir), which sorts last and would be picked wrongly.
+- SessionStart no longer maintains symlinks; it injects guidance + auto-rebinds from cwd-memo as before.
+
 ## 0.1.2 — 2026-05-28
 
 - **Symlinks at `~/.claude/bus/` are now relative.** Previously they stored an absolute target (e.g. `/home/claude/.claude/plugins/.../bus.py`), which broke when `~/.claude` is a shared bind-mount between a Docker container and the host — the absolute path is only valid in one namespace, so a session in the other namespace (or a native host session reusing a container-written link) failed with "no such file." Relative targets resolve correctly from both namespaces since link and target share the `~/.claude` root. Affects the SessionStart hook and `bus.py register`.

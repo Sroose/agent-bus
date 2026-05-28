@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.2 — 2026-05-28
+
+- **Dropped the `~/.claude/confluence-sync/` script symlink; helper is now resolved at call time** via `find ~/.claude/plugins/cache -path '*confluence-sync*/confluence_sync.py' | sort -V | tail -1`. Same rationale as agent-bus 0.1.3 — a shared symlink can't serve a container and the host simultaneously. The SessionStart hook (whose only job was the symlink) has been removed entirely.
+
 ## 0.1.1 — 2026-05-28
 
 - **Symlink at `~/.claude/confluence-sync/confluence_sync.py` is now relative.** Same fix as agent-bus 0.1.2: an absolute symlink target breaks when `~/.claude` is a shared bind-mount between a Docker container and the host. Relative targets resolve from both namespaces.

@@ -52,7 +52,8 @@ TS=$(date +%Y%m%d-%H%M%S)
 [ -f X.CUR.md ] && mv X.CUR.md "X.CUR.$TS.md"
 
 # Pull fresh from Confluence
-python3 ~/.claude/confluence-sync/confluence_sync.py fetch '<URL>' -o X.CUR.md
+CSYNC=$(find ~/.claude/plugins/cache -path '*confluence-sync*/confluence_sync.py' 2>/dev/null | sort -V | tail -1)
+python3 "$CSYNC" fetch '<URL>' -o X.CUR.md
 
 # Cold start: if no working file yet, seed it from the snapshot
 [ ! -f X.md ] && cp X.CUR.md X.md
@@ -92,7 +93,7 @@ Tell the user `X.CUR.md` (current Confluence) and `X.md` (your proposal) are bot
 Re-pull from Confluence and triage the deviations between what you proposed and what actually landed:
 
 ```bash
-python3 ~/.claude/confluence-sync/confluence_sync.py fetch '<URL>' -o X.NEW.md
+python3 "$CSYNC" fetch '<URL>' -o X.NEW.md   # CSYNC resolved as in "Resolving the helper script"
 diff -u X.md X.NEW.md   # for your eyes; do not paste the output to the user
 ```
 
@@ -127,16 +128,19 @@ latest=$(ls -t X.PREV.*-*.md 2>/dev/null | head -1)
 [ -n "$latest" ] && cp "$latest" X.md
 ```
 
-## Script location
+## Resolving the helper script
 
-The plugin's SessionStart hook maintains a stable symlink at `~/.claude/confluence-sync/confluence_sync.py` so all invocations below use one fixed path regardless of plugin install location. If the symlink is missing (very first session, or hook failed), fall back to discovery:
+The helper lives inside the installed plugin under a version directory. Resolve the newest installed copy at call time — don't cache the path:
 
 ```bash
-SCRIPT=$(find "$HOME/.claude" -path '*confluence-sync*/confluence_sync.py' 2>/dev/null | head -1)
-python3 "$SCRIPT" ...
+CSYNC=$(find ~/.claude/plugins/cache -path '*confluence-sync*/confluence_sync.py' 2>/dev/null | sort -V | tail -1)
 ```
 
-Then ask the user to restart the session so the hook can create the symlink.
+`~/.claude/plugins/cache` is scoped deliberately — a blanket `~/.claude` search also matches the marketplace repo clone under `plugins/marketplaces/…`, which has no version dir and would sort last. `sort -V | tail -1` picks the highest installed version.
+
+Set `CSYNC` at the start of each Bash call below (each tool call is a fresh shell, so re-resolve every time), then `python3 "$CSYNC" <args>`. In the snippets below, `$CSYNC` means exactly that expression.
+
+> If `$CSYNC` comes back empty (e.g. testing via `--plugin-dir`), invoke the script by its explicit plugin path instead.
 
 ## Auth — the Confluence session cookie
 
@@ -159,7 +163,8 @@ If a `fetch` call prints `ERR_AUTH_INVALID` or `ERR_AUTH_MISSING` on stderr:
 When the user says `set confluence cookie '<value>'`, `update confluence key '<value>'`, or similar:
 
 ```bash
-python3 ~/.claude/confluence-sync/confluence_sync.py set-token '<value>'
+CSYNC=$(find ~/.claude/plugins/cache -path '*confluence-sync*/confluence_sync.py' 2>/dev/null | sort -V | tail -1)
+python3 "$CSYNC" set-token '<value>'
 ```
 
 `<value>` is the full Cookie header content from browser DevTools, including the cookie name — e.g. `tenant.session.token=eyJ...`. The script rejects values without `=` with a helpful error so users notice if they only pasted the JWT.

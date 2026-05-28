@@ -24,8 +24,10 @@ How the plugin works under the hood, and the design choices behind it. Read this
   archive/<filename>.json       handled messages
   cwd-memo/<sha>.json           per-host-directory remembered name (survives unregister)
   log/watcher.log               per-watcher diagnostics
-  bus.py                        symlink → the helper for the currently-running plugin
 ```
+
+The helper scripts (`bus.py`, `watch.py`) are **not** copied or symlinked here —
+they're resolved at call time from the plugin cache (see Helper resolution below).
 
 ## Identity
 
@@ -42,6 +44,22 @@ When you `/agent register OBSIDIAN`, the plugin writes a memo to `~/.claude/bus/
 On `SessionEnd`, the registry entry is removed, but the memo is **kept**. When a fresh session starts in the same host directory, its watcher reads the memo on startup, finds no live registration for the remembered name, and claims it automatically.
 
 `/agent unregister` (the explicit user command) **does** delete the memo — that's the opt-out path. `SessionEnd` (automatic cleanup on clean exit) does not.
+
+## Helper resolution
+
+The skill, the hooks, and the watcher all need to invoke `bus.py` / `watch.py`, which live in the versioned plugin cache (`~/.claude/plugins/cache/<marketplace>/agent-bus/<version>/skills/agent/`). Rather than cache a resolved path, every caller re-resolves at call time:
+
+```bash
+find ~/.claude/plugins/cache -path '*agent-bus*/skills/agent/bus.py' 2>/dev/null | sort -V | tail -1
+```
+
+- Scoped to `~/.claude/plugins/cache` — a blanket `~/.claude` search also matches the marketplace **repo clone** under `plugins/marketplaces/…` (no version dir), which sorts last lexically and would be picked wrongly by `tail -1`.
+- `sort -V | tail -1` picks the highest installed version.
+- Runs in the **caller's** namespace, so `~` expands correctly whether on the host or inside a container sharing the `~/.claude` mount.
+
+**Why not a symlink?** Earlier versions (≤0.1.2) symlinked `~/.claude/bus/bus.py` → the versioned script. That broke repeatedly: a single shared link can't serve a container ($HOME=/home/claude) and the host ($HOME=/Users/…) at once; the symlink-repair logic was only reachable *through* the link (circular when it dangled); and version-pinned targets went stale. Call-time resolution removes the whole class of bug — nothing is cached, so nothing goes stale. (Removed in 0.1.3.)
+
+The one cost: a `find` per invocation (milliseconds, scoped). `--plugin-dir` dev installs live outside the cache and won't be found — for dev, invoke the script by its explicit path.
 
 ## File watcher
 
@@ -64,7 +82,7 @@ All three produce the same output stream and feed the same pre-filtering logic. 
 
 | Hook | Purpose |
 |---|---|
-| `SessionStart` | Maintain `~/.claude/bus/bus.py` symlink to the live plugin's helper. Inject protocol guidance into Claude's context. If a cwd-memo exists for the current host_cwd and the name is free, nudge Claude to auto-rebind. |
+| `SessionStart` | Inject protocol guidance into Claude's context. If a cwd-memo exists for the current host_cwd and the name is free, auto-rebind (write the registry entry directly) and tell Claude to start the watcher. |
 | `UserPromptSubmit` | Sync `sessionTitle` (the `/resume` picker label) to the registered name. |
 | `SessionEnd` | Auto-unregister this session on clean exit. Skipped on `exit_reason=resume` so `/resume`-ing in the same container doesn't drop the registration. |
 
