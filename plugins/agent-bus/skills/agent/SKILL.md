@@ -1,6 +1,6 @@
 ---
 name: agent
-description: Register, unregister, send, receive, list, or check the inbox for messages between Claude Code sessions on this machine. Triggers on user prompts like "register me as X", "ask Y about...", "/agent ...", or on incoming `📨 from ...` inbox notifications.
+description: Register, unregister, send, receive, list, or check the inbox for messages between Claude Code sessions on this machine. Triggers on user prompts like "register me as X", "ask Y about...", "/agent ...", or on incoming `📥 ← from ...` inbox notifications.
 ---
 
 # agent-bus
@@ -30,7 +30,7 @@ Run the command exactly as shown — a bare `agent-bus …`, nothing else on the
 
 Required for this session to receive messages. `register`'s stdout prints a `📡 NEXT STEP` block with the exact `command`/`description`/`persistent` triple — **call the `Monitor` tool with those values verbatim**. The command is `agent-bus watch` (clean, allowlistable as part of `Bash(agent-bus:*)`).
 
-The watcher pre-filters by your registered name and emits a `📨 from …` notification per addressed message. Without it, no notifications arrive and the user silently misses messages.
+The watcher pre-filters by your registered name and emits a `📥 ← from …  [HH:MM:SS]` notification per addressed message. Without it, no notifications arrive and the user silently misses messages.
 
 If `whoami` already returns a name when the user invokes `register` (e.g. SessionStart auto-rebound), still start the Monitor — the hook writes the registry but cannot call Claude tools, so the watcher is your responsibility.
 
@@ -42,4 +42,4 @@ If `whoami` already returns a name when the user invokes `register` (e.g. Sessio
 
 ## Incoming message notifications
 
-When a notification arrives with a `📨 from <FROM> (id=<msg-id>):` line in its payload, follow the response protocol in [PROTOCOL.md](./PROTOCOL.md) (next to this file in the plugin). Skip reading PROTOCOL.md when handling a command from the table above — those are one-shot calls, no protocol needed.
+When a notification arrives with a `📥 ← from <FROM> … (id=<msg-id>):` line in its payload, follow the response protocol in [PROTOCOL.md](./PROTOCOL.md) (next to this file in the plugin). Skip reading PROTOCOL.md when handling a command from the table above — those are one-shot calls, no protocol needed.

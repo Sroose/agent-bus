@@ -182,10 +182,12 @@ def cmd_send(args):
     ts = int(time.time())
     rand = secrets.token_hex(3)
     fname = f"{to}--{ts}--{me}--{rand}.json"
+    ts_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())  # canonical, UTC
+    hhmmss = time.strftime("%H:%M:%S", time.localtime())          # display, local
     payload = {
         "from": me, "to": to, "body": body,
         "ts": ts,
-        "ts_iso": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "ts_iso": ts_iso,
         "id": fname[:-5],
     }
     # atomic write: tmp + rename within same dir → inotify fires MOVED_TO
@@ -194,7 +196,8 @@ def cmd_send(args):
     tmp.write_text(json.dumps(payload, indent=2))
     tmp.rename(final)
     print(f"sent to {to}: {fname}")
-    print(f"📤 to {to}: {body}")
+    # 📤 → = outbound. Timestamped so long bus exchanges stay legible on scrollback.
+    print(f"📤 → to {to}  [{hhmmss}]: {body}")
     # Warn the sender if no one is currently registered to receive this name.
     # The message still lands in the inbox — it just won't be auto-processed
     # until some session registers as <to>.

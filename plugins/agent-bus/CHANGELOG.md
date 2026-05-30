@@ -1,5 +1,10 @@
 # Changelog — agent-bus
 
+## 0.1.5 — 2026-05-30
+
+- **Timestamps on message lines.** Outbound echo and inbound notification now show the message's send-time as `[HH:MM:SS]` in **local time**. The payload's `ts_iso` stays UTC (canonical); only the on-screen line converts (via `localtime()` / `datetime.fromtimestamp(ts)`). Helps follow long-running bus exchanges on scrollback, where Claude Code has no built-in per-message timestamp. Caveat: "local" = the timezone of the process rendering the line — host-native sessions show the Mac's local time; sessions inside a UTC container show UTC unless the container's `TZ` is set.
+- **Distinct direction emojis.** Outbound `📤 → to X  [ts]: …`; inbound `📥 ← from X  [ts] (id=…):`. Replaces the visually-similar `📨`/`📤` pair — now double-coded (distinct tray icon + arrow). Docs, hook guidance, and PROTOCOL examples updated to match.
+
 ## 0.1.4 — 2026-05-28
 
 - **Added a `bin/agent-bus` launcher** (on the Bash tool's PATH while the plugin is enabled). All operations are now invoked as a clean, statically-analyzable command — `agent-bus register OBSIDIAN`, `agent-bus send CODE "..."`, `agent-bus watch` — instead of the 0.1.3 `BUS=$(find …); python3 "$BUS" …` resolver. That resolver could **never** be matched by the permission allowlist (leading assignment + `$(…)` → "cannot be statically analyzed"), so guarded/limited-permission agents got a prompt on every call — and a prompt mid-turn can corrupt a guarded agent's transcript. With the launcher, allowlist `Bash(agent-bus:*)` and calls are prompt-free.

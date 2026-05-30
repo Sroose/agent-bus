@@ -137,10 +137,20 @@ def emit_if_relevant(filename: str):
         return
     body = d.get("body", "") or ""
     msg_id = d.get("id", filename[:-5] if filename.endswith(".json") else filename)
+    # Show the sender's send-time in LOCAL time (HH:MM:SS). The payload stores
+    # epoch `ts` (and UTC ts_iso); datetime.fromtimestamp() converts to local.
+    hhmmss = ""
+    try:
+        hhmmss = datetime.fromtimestamp(d["ts"]).strftime("%H:%M:%S")
+    except Exception:
+        sent = d.get("ts_iso", "") or ""
+        hhmmss = sent[11:19] if len(sent) >= 19 else sent  # fallback: UTC slice
+    stamp = f"  [{hhmmss}]" if hhmmss else ""
     log(f"EMIT {filename}: from={d.get('from','?')} bytes={len(body)}")
-    print(f"📨 from {d.get('from', '?')} (id={msg_id}):", flush=True)
+    # 📥 ← = inbound (distinct tray + arrow from the 📤 → outbound echo).
+    print(f"📥 ← from {d.get('from', '?')}{stamp} (id={msg_id}):", flush=True)
     print(body, flush=True)
-    print(f"📨 end", flush=True)
+    print(f"📥 end", flush=True)
 
 
 def watch_inotify():
